@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  */
 public class Codeformatter {
 
-    private final String[] schluesselwoerter = {"if", "for", "while"};
+    private final String[] keywords = {"if", "for", "while"};
 
 
     public static void main(String[] args) {
@@ -35,40 +35,40 @@ public class Codeformatter {
         BufferedReader br               = new BufferedReader(new StringReader(textToFormat));
         List<Object>           lines    = new ArrayList<Object>();
 
-        String zeile;
+        String line;
 
         // Laengen ermitteln
-        while((zeile = br.readLine()) != null) {
+        while((line = br.readLine()) != null) {
 
-            char[] chars = new char[zeile.length()];
-            zeile.getChars( 0, zeile.length() - 1, chars, 0 );
+            char[] chars = new char[line.length()];
+            line.getChars( 0, line.length() - 1, chars, 0 );
 
-            if(isMethodenaufruf( zeile )) {
+            if( isMethodCall( line )) {
                 List<Object> subsizes = new ArrayList<Object>();
-                Map<String, Object> content = analyseMethodCall( zeile, subsizes );
+                Map<String, Object> content = analyseMethodCall( line, subsizes );
                 lines.add(new Object[]{ content, subsizes });
             } else {
-                lines.add( zeile );
+                lines.add( line );
             }
 
         }
 
         List<Object> sizes = new ArrayList<Object>();
 
-        for(Object line : lines) {
-            if(line instanceof Object[]) {
-                Object[] lineElements = (Object[]) line;
+        for(Object lineObj : lines) {
+            if(lineObj instanceof Object[]) {
+                Object[] lineElements = (Object[]) lineObj;
                 List<Object> linesizes = (List<Object>)lineElements[1];
                 sizes = joinSizeLists( sizes, linesizes );
             }
         }
 
 
-        for(Object line : lines) {
-            if(line instanceof String) {
-                System.out.println(line);
+        for(Object lineObj : lines) {
+            if(lineObj instanceof String) {
+                System.out.println(lineObj);
             } else {
-                String outputLine = methodCallContentToString(line);
+                String outputLine = methodCallContentToString(lineObj);
                 System.out.println(outputLine);
             }
         }
@@ -123,20 +123,20 @@ public class Codeformatter {
         // Laengen ermitteln
         while((zeile = br.readLine()) != null) {
 
-            if(isZeileMitSchluesselwort(zeile)) {
+            if( isKeywordLine( zeile )) {
                 lines.add( zeile );
                 continue;
             }
 
             if(!zeile.contains("=")) {
-                breiten = aktualisiereMethodenaufrufBreiten(zeile, breiten);
+                breiten = updateMethodNameSizes( zeile, breiten );
                 String innenteil = getParameter(zeile);
-                parameterBreiten = aktualisiereParameterListenBreiten(innenteil, parameterBreiten);
+                parameterBreiten = updateParameterSizes( innenteil, parameterBreiten );
 
                 char[] chars = new char[zeile.length()];
                 zeile.getChars( 0, zeile.length() - 1, chars, 0 );
 
-                if(isMethodenaufruf( zeile )) {
+                if( isMethodCall( zeile )) {
                     List<Object> subsizes = new ArrayList<Object>();
                     Map<String, Object> content = analyseMethodCall( zeile, subsizes );
                     lines.add(new Object[]{ content, subsizes });
@@ -183,7 +183,7 @@ public class Codeformatter {
             if(line instanceof String) {
                 zeile = (String)line;
 
-                if(isZeileMitSchluesselwort( zeile )) {
+                if( isKeywordLine( zeile )) {
                     formattierterText.append( zeile );
                 } else {
                     int          pos               = zeile.indexOf("=");
@@ -207,7 +207,7 @@ public class Codeformatter {
                         formattierterText.append("\n");
                         continue;
                     } else {
-                        formattierterText.append(leerzeichen(prefixWhitespaces));
+                        formattierterText.append( createWhitespaces( prefixWhitespaces ));
                     }
 
                     String vartyp = vorderteileLst.get(0);
@@ -215,7 +215,7 @@ public class Codeformatter {
                     formattierterText.append(vartyp);
 
                     if(vartyp.length() < maxvarlen) {
-                        formattierterText.append(leerzeichen(maxvarlen - vartyp.length()));
+                        formattierterText.append( createWhitespaces( maxvarlen - vartyp.length() ));
                     }
 
                     formattierterText.append(" ");
@@ -225,7 +225,7 @@ public class Codeformatter {
                     formattierterText.append(varname);
 
                     if(varname.length() < maxnamelen) {
-                        formattierterText.append(leerzeichen(maxnamelen - varname.length()));
+                        formattierterText.append( createWhitespaces( maxnamelen - varname.length() ));
                     }
 
                     formattierterText.append(" ");
@@ -236,7 +236,7 @@ public class Codeformatter {
 
             if (line instanceof Object[]) {
 
-                zeile = formatMethodenaufruf(zeile, breiten, parameterBreiten);
+                zeile = formatMethodCall( zeile, breiten, parameterBreiten );
                 formattierterText.append(zeile);
                 formattierterText.append("\n");
                 continue;
@@ -248,8 +248,8 @@ public class Codeformatter {
     }
 
 
-    private String formatMethodenaufruf(String text, List<Integer> breiten, List<Integer> parameterBreiten) {
-        if(!isMethodenaufruf(text.trim())) {
+    private String formatMethodCall(String text, List<Integer> breiten, List<Integer> parameterBreiten) {
+        if(!isMethodCall( text.trim() )) {
             return text;
         }
 //            if(!(text.contains("(") && text.endsWith(");"))) {
@@ -260,7 +260,7 @@ public class Codeformatter {
         StringTokenizer st                = new StringTokenizer(vorderteil, ".");
         Iterator<Integer> breitenIt         = breiten.iterator();
         int               prefixWhitespaces = countLeadingWhitespaces(text);
-        StringBuilder     formatierterText  = new StringBuilder(leerzeichen(prefixWhitespaces));
+        StringBuilder     formatierterText  = new StringBuilder( createWhitespaces( prefixWhitespaces ));
 
         while(st.hasMoreElements()) {
             String teil   = st.nextToken().trim();
@@ -270,7 +270,7 @@ public class Codeformatter {
             formatierterText.append( teil );
 
             if(teil.length() < maxlen) {
-                formatierterText.append( leerzeichen(maxlen - len) );
+                formatierterText.append( createWhitespaces( maxlen - len ) );
             }
 
             if(st.hasMoreElements()) {
@@ -280,7 +280,7 @@ public class Codeformatter {
 
         if(breitenIt.hasNext()) {
             while(breitenIt.hasNext()) {
-                formatierterText.append(leerzeichen(breitenIt.next()));
+                formatierterText.append( createWhitespaces( breitenIt.next() ));
             }
         }
 
@@ -294,7 +294,7 @@ public class Codeformatter {
             }
 
             if(innenteil.contains(",")) {
-                innenteil = formatParameterListe(innenteil, parameterBreiten);
+                innenteil = formatParameters( innenteil, parameterBreiten );
             }
             formatierterText.append( innenteil );
 
@@ -309,15 +309,15 @@ public class Codeformatter {
     }
 
 
-    private List<Integer> aktualisiereMethodenaufrufBreiten(String text, List<Integer> breiten) {
-        if(!isMethodenaufruf(text.trim())) {
+    private List<Integer> updateMethodNameSizes(String text, List<Integer> breiten) {
+        if(!isMethodCall( text.trim() )) {
             return breiten;
         }
 //            if(!(text.contains("(") && text.endsWith(");"))) {
 //                return breiten;
 //            }
 
-        String            vorderteil = getMethode(text);
+        String            vorderteil = getMethodName( text );
         StringTokenizer   st         = new StringTokenizer(vorderteil, ".");
         Iterator<Integer> breitenIt  = breiten.iterator();
         List<Integer>     neueBreiten = new ArrayList<Integer>();
@@ -362,13 +362,13 @@ public class Codeformatter {
             } else if(c == ')') {
                 Object child;
                 String value = buffer.toString();
-                if(isMethodenaufruf( value )) {
+                if( isMethodCall( value )) {
                     List<Object> subsizes = new ArrayList<Object>();
                     child = analyseMethodCall( value, subsizes );
                     sizes.add( subsizes );
                 } else if(isParameter( buffer.toString() )) {
                     List<Object> subsizes = new ArrayList<Object>();
-                    child = splitKommaseperatedList( value,  subsizes);
+                    child = splitParameters( value, subsizes );
                     sizes.add( subsizes );
                 } else {
                     child = value;
@@ -385,7 +385,7 @@ public class Codeformatter {
     }
 
 
-    private List<Object> splitKommaseperatedList(String textToSplit, List<Object> sizes) {
+    private List<Object> splitParameters(String textToSplit, List<Object> sizes) {
         char[] chars = new char[textToSplit.length()];
         textToSplit.getChars( 0, textToSplit.length(), chars, 0 );
 
@@ -425,42 +425,42 @@ public class Codeformatter {
         return elements;
     }
 
-    private List<Integer> aktualisiereParameterListenBreiten(String text, List<Integer> breiten) {
+    private List<Integer> updateParameterSizes(String text, List<Integer> sizes) {
         if(!isParameter(text)) {
-            return breiten;
+            return sizes;
         }
 //            if (!(text.contains(","))) {
 //                return breiten;
 //            }
 
         StringTokenizer st = new StringTokenizer(text, ",");
-        Iterator<Integer> breitenIt = breiten.iterator();
-        List<Integer> neueBreiten = new ArrayList<Integer>();
+        Iterator<Integer> sizesIt = sizes.iterator();
+        List<Integer> newSizes = new ArrayList<Integer>();
 
         while (st.hasMoreElements()) {
-            String teil = st.nextToken().trim();
+            String token = st.nextToken().trim();
 
-            int len = teil.length();
+            int len = token.length();
 
-            if (breitenIt.hasNext()) {
-                int maxlen = breitenIt.next();
+            if (sizesIt.hasNext()) {
+                int maxlen = sizesIt.next();
 
                 if (len > maxlen) {
-                    neueBreiten.add(len);
+                    newSizes.add( len );
                 } else {
-                    neueBreiten.add(maxlen);
+                    newSizes.add( maxlen );
                 }
 
             } else {
-                neueBreiten.add(len);
+                newSizes.add( len );
             }
         }
 
-        return neueBreiten;
+        return newSizes;
     }
 
 
-    private String formatParameterListe(String text, List<Integer> breiten) {
+    private String formatParameters(String text, List<Integer> breiten) {
         if(!isParameter(text)) {
             return text;
         }
@@ -477,7 +477,7 @@ public class Codeformatter {
             formatierterText.append( teil );
 
             if(teil.length() < maxlen) {
-                formatierterText.append( leerzeichen(maxlen - len) );
+                formatierterText.append( createWhitespaces( maxlen - len ) );
             }
 
             if(st.hasMoreElements()) {
@@ -487,7 +487,7 @@ public class Codeformatter {
 
         if(breitenIt.hasNext()) {
             while(breitenIt.hasNext()) {
-                formatierterText.append(leerzeichen(breitenIt.next()));
+                formatierterText.append( createWhitespaces( breitenIt.next() ));
             }
         }
 
@@ -495,9 +495,9 @@ public class Codeformatter {
     }
 
 
-    private boolean isZeileMitSchluesselwort(String zeile) {
-        for (String schluesselwort : schluesselwoerter) {
-            if (zeile.contains(schluesselwort + "(") || zeile.contains(schluesselwort + " (")) {
+    private boolean isKeywordLine(String line) {
+        for (String keyword : keywords ) {
+            if (line.contains(keyword + "(") || line.contains(keyword + " (")) {
                 return true;
             }
         }
@@ -505,7 +505,7 @@ public class Codeformatter {
     }
 
 
-    private String leerzeichen(int anzahl) {
+    private String createWhitespaces(int anzahl) {
         StringBuilder leerstring = new StringBuilder(anzahl);
         for(int i = 0; i < anzahl; i++) {
             leerstring.append(" ");
@@ -535,12 +535,12 @@ public class Codeformatter {
     }
 
 
-    private String getMethode(String text) {
+    private String getMethodName(String text) {
         return text.substring(0, text.indexOf("("));
     }
 
 
-    private boolean isMethodenaufruf(String text) {
+    private boolean isMethodCall(String text) {
         return text.contains("(") && text.contains(");");
 //            Pattern p = Pattern.compile("[\\s,\\t]*[\\w,\\d,.]*\\([\\d\\w,\\(,\\),\\.,\\s,\"]*,*\\);[\\D,\\W]*");
 //            Matcher m = p.matcher(text);
