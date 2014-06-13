@@ -27,10 +27,13 @@ public class Codeformatter {
 
 
     public void test() throws IOException {
-        String textToFormat = "        getPosPanel().getArtikelNrInput().addFocusAction(new LAction(this,\"checkArtikelNrInfoButtonEnabled\"));\n" +
-                "        getPosPanel().getZollCodeInput().addFocusAction(new LAction(this,\"checkArtikelNrInfoButtonEnabled\"));\n" +
-                "        getPosPanel().getMengeInput().addFocusAction(new LAction(this,\"checkArtikelMengeInfoButtonEnabled\"));\n" +
-                "        getPosPanel().getZollCodeInput().addFocusAction(new LAction(this,\"checkZollCodeInfoButtonEnabled\"));\n";
+//        String textToFormat = "        getPosPanel().getArtikelNrInput().addFocusAction(new LAction(this,\"checkArtikelNrInfoButtonEnabled\"));\n" +
+//                "        getPosPanel().getZollCodeInput().addFocusAction(new LAction(this,\"checkArtikelNrInfoButtonEnabled\"));\n" +
+//                "        getPosPanel().getMengeInput().addFocusAction(new LAction(this,\"checkArtikelMengeInfoButtonEnabled\"));\n" +
+//                "        getPosPanel().getZollCodeInput().addFocusAction(new LAction(this,\"checkZollCodeInfoButtonEnabled\"));\n";
+
+        String textToFormat  = "    new FocusAction(this,\"checkArtikelNrInfoButtonEnabled\");\n"
+                             + "    new LAction(this,\"checkArtikelNrInfoButton\")\n";
 
         BufferedReader br               = new BufferedReader(new StringReader(textToFormat));
         List<Object>           lines    = new ArrayList<Object>();
@@ -39,16 +42,16 @@ public class Codeformatter {
 
         // Laengen ermitteln
         while((line = br.readLine()) != null) {
+            String[] parts = line.split( "\\." );
 
-            char[] chars = new char[line.length()];
-            line.getChars( 0, line.length() - 1, chars, 0 );
-
-            if( isMethodCall( line )) {
-                List<Object> subsizes = new ArrayList<Object>();
-                Map<String, Object> content = analyseMethodCall( line, subsizes );
-                lines.add(new Object[]{ content, subsizes });
-            } else {
-                lines.add( line );
+            for( String part : parts ) {
+                if( isMethodCall( part ) ) {
+                    List<Object> subsizes = new ArrayList<Object>();
+                    Map<String, Object> content = analyseMethodCall( part, subsizes );
+                    lines.add( new Object[]{content, subsizes} );
+                } else {
+                    lines.add( part );
+                }
             }
 
         }
@@ -63,12 +66,11 @@ public class Codeformatter {
             }
         }
 
-
         for(Object lineObj : lines) {
             if(lineObj instanceof String) {
                 System.out.println(lineObj);
             } else {
-                String outputLine = methodCallContentToString(lineObj);
+                String outputLine = methodCallContentToString((Map<String, Object>)((Object[])lineObj)[0], sizes);
                 System.out.println(outputLine);
             }
         }
@@ -104,8 +106,67 @@ public class Codeformatter {
     }
 
 
-    private String methodCallContentToString(Object line) {
-        return null;
+    private String methodCallContentToString(Map<String, Object> content, List<Object> sizes) {
+        StringBuilder result = new StringBuilder();
+        List<String>  keyLst = new ArrayList<String>();
+        Set<String>   keys   = content.keySet();
+        keyLst.addAll( keys );
+
+        for(int i = 0; i < keyLst.size(); i++) {
+            String key = keyLst.get(i);
+
+            Object value = content.get( key );
+
+            if(value == null) {
+                int keySize = (Integer)sizes.get( i );
+                result.append(key);
+                result.append(createWhitespaces(keySize - key.length()));
+            } else if(value instanceof Map) {
+                List<Object> size = (List<Object>)sizes.get( i );
+                int keySize = (Integer)size.get( 0 );
+                result.append(key);
+                result.append(createWhitespaces(keySize - key.length()));
+                result.append("( ");
+                result.append( methodCallContentToString( (Map)value,  size) );
+                result.append(" )");
+            } else if(value instanceof List) {
+                List<Object> size     = (List<Object>)sizes.get( i );
+                List<Object> valueLst = (List<Object>)value;
+                String formattedValue = paramListContentToString(valueLst, size);
+                result.append(formattedValue);
+            }
+        }
+
+        return result.toString();
+    }
+
+
+    private String paramListContentToString(List<Object> valueLst, List<Object> size) {
+        StringBuilder result = new StringBuilder();
+
+        for(int j = 0; j < valueLst.size(); j++) {
+            if(result.length() > 0) {
+                result.append(", ");
+            }
+            Object param          = valueLst.get( j );
+            if(param instanceof Map) {
+                Map<String,Object> subMethodCallContent = (Map<String, Object>) param;
+                List<Object>       subsizes             = (List<Object>)size.get( j );
+                String formattedValue = methodCallContentToString( subMethodCallContent, subsizes );
+                result.append(formattedValue);
+            } else if(param instanceof List) {
+                List<Object> paramLst = (List<Object>)param;
+                List<Object> subsizes = (List<Object>)size.get( j );
+                String formattedValue = paramListContentToString(paramLst, subsizes);
+                result.append(formattedValue);
+            } else if(param instanceof String) {
+                result.append((String)param);
+                Integer paramSize = (Integer)size.get( j );
+                result.append(createWhitespaces( paramSize ));
+            }
+        }
+
+        return result.toString();
     }
 
 
@@ -113,7 +174,7 @@ public class Codeformatter {
         BufferedReader br               = new BufferedReader(new StringReader(textToFormat));
         int            maxvarlen        = 0;
         int            maxnamelen       = 0;
-        List<Integer> breiten          = new ArrayList<Integer>();
+        List<Integer>  breiten          = new ArrayList<Integer>();
         List<Integer>  parameterBreiten = new ArrayList<Integer>();
 
         List<Object>              lines    = new ArrayList<Object>();
@@ -252,12 +313,9 @@ public class Codeformatter {
         if(!isMethodCall( text.trim() )) {
             return text;
         }
-//            if(!(text.contains("(") && text.endsWith(");"))) {
-//                return text;
-//            }
 
         String            vorderteil        = text.substring(0, text.indexOf("("));
-        StringTokenizer st                = new StringTokenizer(vorderteil, ".");
+        StringTokenizer   st                = new StringTokenizer(vorderteil, ".");
         Iterator<Integer> breitenIt         = breiten.iterator();
         int               prefixWhitespaces = countLeadingWhitespaces(text);
         StringBuilder     formatierterText  = new StringBuilder( createWhitespaces( prefixWhitespaces ));
@@ -364,6 +422,7 @@ public class Codeformatter {
                 String value = buffer.toString();
                 if( isMethodCall( value )) {
                     List<Object> subsizes = new ArrayList<Object>();
+                    subsizes.add( key.length() );
                     child = analyseMethodCall( value, subsizes );
                     sizes.add( subsizes );
                 } else if(isParameter( buffer.toString() )) {
