@@ -1,8 +1,3 @@
-/*
- * Copyright (c) 2013 dbh Logistics IT AG, Inc. All rights reserved.
- * Use is subject to license terms.
- */
-
 package de.dbh.intellij.codeformatter;
 
 import java.io.BufferedReader;
@@ -24,14 +19,23 @@ public class Codeformatter {
 
     public static void main(String[] args) {
         try {
-            new Codeformatter().test();
+//            new Codeformatter().testMethodCall();
+            new Codeformatter().testVariable();
         } catch( IOException e ) {
             e.printStackTrace();
         }
     }
 
 
-    public void test() throws IOException {
+    public void testVariable() throws IOException {
+//        String textToFormat = "    test.bla = 1;\n    test.blaa = 2;\n    int testVar = 3\n    public final int testVar2 = 4\n    public final static String testVar3 = 5\n";
+        String textToFormat = "        test.bla = 1;\n        test.blaa = 2;\n";
+        String formattedText = format( textToFormat );
+        System.out.println( formattedText );
+    }
+
+
+    public void testMethodCall() throws IOException {
         String textToFormat = "        getPosPanel().getArtikelNrInput().addFocusAction(new LAction(this,\"checkArtikelNrInfoButtonEnabled\"));\n" +
                 "        getPosPanel().getZollCodeInput().addFocusAction(new LAction(this,\"checkArtikelNrInfoButtonEnabled\"));\n" +
                 "        getPosPanel().getMengeInput().addFocusAction(new LAction(this,\"checkArtikelMengeInfoButtonEnabled\"));\n" +
@@ -49,9 +53,10 @@ public class Codeformatter {
             zeile.getChars( 0, zeile.length() - 1, chars, 0 );
 
             if(isMethodenaufruf( zeile )) {
-                List<Object> subsizes = new ArrayList<Object>();
-                Map<String, Object> content = analyseMethodCall( zeile, subsizes );
-                lines.add(new Object[]{ content, subsizes });
+//                List<Object> subsizes = new ArrayList<Object>();
+//                Map<String, Object> content = analyseMethodCall( zeile, subsizes );
+//                lines.add(new Object[]{ content, subsizes });
+                lines.add( zeile );
             } else {
                 lines.add( zeile );
             }
@@ -155,7 +160,7 @@ public class Codeformatter {
             int          pos            = zeile.indexOf("=");
             String       vorderteil     = zeile.substring(0,pos - 1);
 
-            String[]     vorderteile    = vorderteil.split(" ");
+            String[]     vorderteile    = getVorderteile( vorderteil );
             List<String> vorderteileLst = new ArrayList<String>(2);
 
             for(int i=0; i < vorderteile.length; i++) {
@@ -164,19 +169,26 @@ public class Codeformatter {
                 }
             }
 
-            if(vorderteileLst.size() != 2) {
-                continue;
+            if( vorderteileLst.size() == 1) {
+                if( vorderteileLst.get( 0 ).length() > maxnamelen ) {
+                    maxnamelen = vorderteileLst.get( 0 ).length();
+                }
+
+                lines.add( zeile );
             }
 
-            if(vorderteileLst.get(0).length() > maxvarlen) {
-                maxvarlen = vorderteileLst.get(0).length();
-            }
+            if(vorderteileLst.size() == 2) {
 
-            if(vorderteileLst.get(1).length() > maxnamelen) {
-                maxnamelen = vorderteileLst.get(1).length();
-            }
+                if( vorderteileLst.get( 0 ).length() > maxvarlen ) {
+                    maxvarlen = vorderteileLst.get( 0 ).length();
+                }
 
-            lines.add(zeile);
+                if( vorderteileLst.get( 1 ).length() > maxnamelen ) {
+                    maxnamelen = vorderteileLst.get( 1 ).length();
+                }
+
+                lines.add( zeile );
+            }
         }
 
         // Zeilen formattieren
@@ -193,7 +205,7 @@ public class Codeformatter {
                 } else {
                     int          pos               = zeile.indexOf("=");
                     String       vorderteil        = zeile.substring(0, pos);
-                    String[]     vorderteile       = vorderteil.split(" ");
+                    String[]     vorderteile       = getVorderteile( vorderteil );
                     List<String> vorderteileLst    = new ArrayList<String>(2);
                     boolean      firstFound        = false;
                     int          prefixWhitespaces = 0;
@@ -207,12 +219,15 @@ public class Codeformatter {
                         }
                     }
 
-                    if(vorderteileLst.size() != 2) {
+                    if(vorderteileLst.size() == 1) {
+                        formattierterText.append( leerzeichen( prefixWhitespaces ) );
+                        vorderteileLst.add( 0, leerzeichen( maxvarlen ) );
+                    } else if(vorderteileLst.size() == 2) {
+                        formattierterText.append( leerzeichen( prefixWhitespaces ) );
+                    } else {
                         formattierterText.append(zeile);
                         formattierterText.append("\n");
                         continue;
-                    } else {
-                        formattierterText.append(leerzeichen(prefixWhitespaces));
                     }
 
                     String vartyp = vorderteileLst.get(0);
@@ -223,9 +238,11 @@ public class Codeformatter {
                         formattierterText.append(leerzeichen(maxvarlen - vartyp.length()));
                     }
 
-                    formattierterText.append(" ");
-
                     String varname = vorderteileLst.get(1);
+
+                    if( maxvarlen > 0 && vartyp.trim().length() > 0) {
+                        formattierterText.append( " " );
+                    }
 
                     formattierterText.append(varname);
 
@@ -250,6 +267,37 @@ public class Codeformatter {
         }
 
         return formattierterText.toString();
+    }
+
+
+    private String[] getVorderteile( String vorderteil ) {
+        String[] vorderteile = vorderteil.split(" ");
+
+        if(vorderteile.length > 2) {
+            String[] korrigierteVorderteile = new String[] { "", "" };
+            int prefixWhitespaces = 0;
+
+            for( int i = 0; i < vorderteile.length - 1; i++ ) {
+
+                if( vorderteile[i].length() == 0) {
+                    prefixWhitespaces++;
+                    continue;
+                }
+
+                if(korrigierteVorderteile[0] != null && korrigierteVorderteile[0].length() > 0 ) {
+                    korrigierteVorderteile[0] += " ";
+                }
+
+                korrigierteVorderteile[0] += vorderteile[i];
+
+            }
+
+            korrigierteVorderteile[0] = leerzeichen( prefixWhitespaces ) + korrigierteVorderteile[0];
+            korrigierteVorderteile[1] = vorderteile[ vorderteile.length - 1 ];
+            vorderteile = korrigierteVorderteile;
+        }
+
+        return vorderteile;
     }
 
 

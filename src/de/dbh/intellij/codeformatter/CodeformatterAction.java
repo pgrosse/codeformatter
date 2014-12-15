@@ -1,7 +1,3 @@
-/*
- * Copyright (c) 2014 dbh Logistics IT AG, Inc. All rights reserved.
- * Use is subject to license terms.
- */
 package de.dbh.intellij.codeformatter;
 
 import com.intellij.openapi.actionSystem.AnAction;
